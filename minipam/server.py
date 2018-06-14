@@ -1,8 +1,9 @@
 import sqlite3
 import sys
 from xmlrpc.server import SimpleXMLRPCServer
-from ipaddress import ip_network
+from ipaddress import ip_network, ip_address
 
+#from minipam import config
 from minipam import config
 from minipam.fault_handling import raise_fault
 from minipam.ip_utils import *
@@ -159,9 +160,9 @@ def claim_net(net, size):
     try:
 
         network = ip_network(net)
-        required_gap = 2**(32 - size)
+        required_gap = 2**(network.max_prefixlen - size)
 
-        if size > network.prefixlen:
+        if size > network.max_prefixlen - network.prefixlen:
             raise_fault("NoMatchingGapAvailable")
 
         nets = get_net(net, depth=1)
@@ -174,21 +175,20 @@ def claim_net(net, size):
             # start and end gaps
             first_block = ip_network(nets["children"][0]["cidr"])
             last_block = ip_network(nets["children"][-1]["cidr"])
-            start_gap = network_address_to_int(first_block) - network_address_to_int(network) - 1
-            last_gap = network_broadcast_to_int(last_block) - network_broadcast_to_int(network) - 1
+            first_gap = network_address_to_int(first_block) - network_address_to_int(network)
+            last_gap =  network_broadcast_to_int(network) - network_broadcast_to_int(last_block) -1
             if first_gap >= required_gap:
-                smallest_gap = { "address" : network.address,
+                smallest_gap = { "address" : network.network_address,
                         "length" : first_gap }
 
             # add all gaps between blocks
             for i, n in enumerate(nets["children"][:-1]):
-                net1 = ip_network(n)
-                net2 = ip_network(nets["children"][i+1])
+                net1 = ip_network(n["cidr"])
+                net2 = ip_network(nets["children"][i+1]["cidr"])
                 gap = network_address_to_int(net2) - network_broadcast_to_int(net1) - 1
-                if gap > required_gap and (smallest_gap is None or gap < smalles_gap["length"]):
+                if gap >= required_gap and (smallest_gap is None or gap < smallest_gap["length"]):
                     smallest_gap = {"address" : ip_address(network_broadcast_to_int(net1) + 1),
                             "length": gap}
-
             if last_gap > required_gap and (smallest_gap is None or last_gap < smallest_gap["length"]):
                 smallest_gap = { "address" : ip_address(network_broadcast_to_int(last_block) + 1),
                         "length" :last_gap}
@@ -196,7 +196,7 @@ def claim_net(net, size):
             if smallest_gap is None:
                 raise_fault("NoMatchingGapAvailable")
 
-            network_string = smallest_gap["address"] + "/" + str(size)
+            network_string = str(smallest_gap["address"]) + "/" + str(size)
             add_net(network_string)
             return get_net(network_string)
 
@@ -215,8 +215,17 @@ def add_tag(net, tag_name, tag_value):
     :returns:
     :raises TagExists: raises a TagExists error if the tag already exists
     """
-    #TODO
-    return None
+    try:
+        network = ip_network(net)
+        c = db_conn.cursor()
+        c.execute("INSERT INTO tags (network_id, tag_name, tag_value) "
+        "VALUES ((SELECT id FROM networks WHERE net = ?), ?, ?)",
+        (net, tag_name, tag_name));
+    except ValueError:
+        raise_fault("InvalidNetworkDescription")
+    except sqlite3.IntegrityError:
+        raise_fault("TagExists")
+    db_conn.commit()
 
 def delete_tag(net, tag_name):
     """
@@ -228,8 +237,16 @@ def delete_tag(net, tag_name):
     :raises TagDoesNotExist: raises a TagDoesNotExist error if the tag does not
     exist.
     """
-    #TODO
-    return None
+    try:
+        network = ip_network(net)
+        c = db_conn.cursor()
+        c.execute("DELETE FROM tags WHERE network_id IN "
+                "(SELECT id AS network_id FROM networks WHERE net = ?) AND "
+                "tag_name = ?",
+                (str(network), tag_name))
+    except ValueError:
+        raise_fault("InvalidNetworkDescription")
+    db_conn.commit()
 
 def modify_tag(net, tag_name, tag_value):
     """
@@ -293,6 +310,8 @@ def setup_xmlrpc_server():
 if __name__ == "__main__":
     start_database_connection()
     print(get_net("192.168.0.0/16", 1))
+    add_tag("192.168.0.0/16", "name", "lan network")
+    add_tag("192.168.0.0/16", "name", "lan network2")
     setup_xmlrpc_server()
 
 

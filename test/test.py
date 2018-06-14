@@ -132,3 +132,61 @@ class TestDeleteMethods(unittest.TestCase):
 
     def test_get_net_not_in_db(self):
         delete_net("10.0.0.0/8")
+
+class TestClaimMethods(unittest.TestCase):
+    def setUp(self):
+        try:
+            remove("test.db")
+        except FileNotFoundError:
+            pass
+        config.database_file = "test.db"
+        start_database_connection()
+
+        add_net("127.0.0.0/8")
+
+    def tearDown(self):
+        close_database_connection()
+        remove("test.db")
+
+    def test_claim_normal(self):
+        add_net("127.0.0.0/16")
+        add_net("127.2.0.0/16")
+
+        claim_net("127.0.0.0/8", 16)
+        result = get_net("127.0.0.0/8")
+        self.assertEqual(result["cidr"] , "127.0.0.0/8")
+        self.assertEqual(len(result["children"]), 3)
+        for i in range(3):
+            self.assertEqual(result["children"][i]["address"], "127.%d.0.0" % i)
+
+    def test_claim_first_gap(self):
+        add_net("127.1.0.0/16")
+        add_net("127.2.0.0/16")
+        claim_net("127.0.0.0/8", 16)
+        result = get_net("127.0.0.0/8")
+        self.assertEqual(result["cidr"] , "127.0.0.0/8")
+        self.assertEqual(len(result["children"]), 3)
+        for i in range(3):
+            self.assertEqual(result["children"][i]["address"], "127.%d.0.0" % i)
+
+    def test_claim_last_gap(self):
+        add_net("127.0.0.0/16")
+        add_net("127.1.0.0/16")
+        claim_net("127.0.0.0/8", 16)
+        result = get_net("127.0.0.0/8")
+        self.assertEqual(result["cidr"] , "127.0.0.0/8")
+        self.assertEqual(len(result["children"]), 3)
+        for i in range(3):
+            self.assertEqual(result["children"][i]["address"], "127.%d.0.0" % i)
+
+    def test_claim_no_matching_gap(self):
+        add_net("127.0.0.0/9")
+        add_net("127.128.0.0/9")
+        with self.assertRaises(Fault) as cm:
+            claim_net("127.0.0.0/8", 16)
+        self.assertEqual(cm.exception.faultString, "NoMatchingGapAvailable")
+
+    def test_claim_host_bits_set(self):
+        with self.assertRaises(Fault) as cm:
+            claim_net("127.0.0.1/8", 16)
+        self.assertEqual(cm.exception.faultString, "InvalidNetworkDescription")

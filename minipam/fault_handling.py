@@ -3,7 +3,8 @@ from xmlrpc.server import Fault
 fault_strings = { 1000: "InvalidFaultCode",
         1001: "InvalidNetworkDescription",
         1002: "NoMatchingGapAvailable",
-        1003: "NetworkNotInDatabase"}
+        1003: "NetworkNotInDatabase",
+        1004: "TagExists"}
 
 #inverse mapping of the fault strings
 fault_codes = {v : k for k,v in fault_strings.items()}
