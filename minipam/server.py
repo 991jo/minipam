@@ -3,9 +3,9 @@ import sys
 from xmlrpc.server import SimpleXMLRPCServer
 from ipaddress import ip_network
 
-import config
-from fault_handling import raise_fault
-from ip_utils import *
+from minipam import config
+from minipam.fault_handling import raise_fault
+from minipam.ip_utils import *
 
 db_conn = None;
 
@@ -53,6 +53,7 @@ def close_database_connection():
 
     global db_conn
     db_conn.close()
+    db_conn = None
 
 def get_net(net, depth=-1):
     """
@@ -73,7 +74,7 @@ def get_net(net, depth=-1):
                     network_address_to_int(network),
                     network_broadcast_to_int(network)))
         results = c.fetchall()
-        if results == None or results[0]["net"] != str(network):
+        if len(results) == 0 or results[0]["net"] != str(network):
             raise_fault("NetworkNotInDatabase")
 
         ret = { "address" : results[0]["net"].split("/")[0],
@@ -140,7 +141,7 @@ def delete_net(net, recursive=False):
             c.execute("DELETE FROM networks WHERE netmask >= ? AND address >= ? and address <= ?",
                     (network.prefixlen, network_address_to_int(network), network_broadcast_to_int(network)))
         else:
-            c.execute("DELETE FROM networks WHERE net = '?'" , str(network))
+            c.execute("DELETE FROM networks WHERE net = ?" , (str(network),))
         db_conn.commit()
         return None
     except ValueError:
@@ -152,8 +153,57 @@ def claim_net(net, size):
     :param net: the network in which the new network should be added
     :param size: the subnet mask, for example 8 or 27
     :returns: the net_dict dictionary of the newly created network
+    :raises NoMatchingGapAvailable: raised if there is no space for a subnet of
+    this size in this network.
     """
-    #TODO
+    try:
+
+        network = ip_network(net)
+        required_gap = 2**(32 - size)
+
+        if size > network.prefixlen:
+            raise_fault("NoMatchingGapAvailable")
+
+        nets = get_net(net, depth=1)
+
+        if len(nets["children"]) == 0:
+            add_net(net)
+            return get_net(net, depth=0)
+        else: #at least one child exists.
+            smallest_gap = None
+            # start and end gaps
+            first_block = ip_network(nets["children"][0]["cidr"])
+            last_block = ip_network(nets["children"][-1]["cidr"])
+            start_gap = network_address_to_int(first_block) - network_address_to_int(network) - 1
+            last_gap = network_broadcast_to_int(last_block) - network_broadcast_to_int(network) - 1
+            if first_gap >= required_gap:
+                smallest_gap = { "address" : network.address,
+                        "length" : first_gap }
+
+            # add all gaps between blocks
+            for i, n in enumerate(nets["children"][:-1]):
+                net1 = ip_network(n)
+                net2 = ip_network(nets["children"][i+1])
+                gap = network_address_to_int(net2) - network_broadcast_to_int(net1) - 1
+                if gap > required_gap and (smallest_gap is None or gap < smalles_gap["length"]):
+                    smallest_gap = {"address" : ip_address(network_broadcast_to_int(net1) + 1),
+                            "length": gap}
+
+            if last_gap > required_gap and (smallest_gap is None or last_gap < smallest_gap["length"]):
+                smallest_gap = { "address" : ip_address(network_broadcast_to_int(last_block) + 1),
+                        "length" :last_gap}
+
+            if smallest_gap is None:
+                raise_fault("NoMatchingGapAvailable")
+
+            network_string = smallest_gap["address"] + "/" + str(size)
+            add_net(network_string)
+            return get_net(network_string)
+
+    except ValueError:
+        raise_fault("InvalidNetworkDescription")
+
+
     return None
 
 def add_tag(net, tag_name, tag_value):
