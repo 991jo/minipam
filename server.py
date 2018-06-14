@@ -1,21 +1,113 @@
 import sqlite3
-from xmlrpc import server
+import sys
+from xmlrpc.server import SimpleXMLRPCServer
+from ipaddress import ip_network
 
 import config
+from fault_handling import raise_fault
+from ip_utils import *
+
+db_conn = None;
+
+def start_database_connection():
+    global db_conn
+    """
+    Sets up the database connection and makes sure that the required tables exist.
+    """
+    if db_conn is None:
+        db_conn = sqlite3.connect(config.database_file)
+        db_conn.row_factory = sqlite3.Row
+
+    c = db_conn.cursor()
+
+    # enable foreign key support in sqlite
+    c.execute("PRAGMA foreign_keys = ON");
+
+    # set up the tables if they do not exist yet
+    c.execute("CREATE TABLE IF NOT EXISTS networks"
+            "(id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "net TEXT UNIQUE," # the net field is redundant to the address and netmask fields,
+                        # the first is for human readable data
+                        # the later is for working with queries.
+            "address INTEGER,"
+            "netmask INTEGER)")
+
+    c.execute("CREATE TABLE IF NOT EXISTS tags"
+            "(network_id INTEGER NOT NULL,"
+            "tag_name TEXT NOT NULL,"
+            "tag_value TEXT,"
+            "PRIMARY KEY (network_id, tag_name)"
+            "FOREIGN KEY (network_id) REFERENCES networks(id)"
+            "ON UPDATE CASCADE " #space is needed to prevent the parser from reading CASCADEON
+            "ON DELETE CASCADE"
+            ")")
 
 
-def get_net(net, depth=0):
+    # save possible changes
+    db_conn.commit()
+
+def close_database_connection():
+    """
+    closes the database connection
+    """
+
+    global db_conn
+    db_conn.close()
+
+def get_net(net, depth=-1):
     """
     returns networks within the given network.
-    This network does not have to exist in the database, but with depth=0 no children
-    will be returned and the output is empty if it is not in the database.
+    This network does have to exist in the database
     :param net: the network (ip/subnet maks) which should be returned
-    :param depth: how many levels of children should be added. Default is 0, -1
+    :param depth: how many levels of children should be added. Default is -1 (return everything)
     means add all children.
     :returns: net_dict dictionary, might by empty
     """
-    #TODO
-    return None
+    try:
+        network = ip_network(net)
+        c = db_conn.cursor()
+        c.execute("SELECT net, address, netmask FROM networks "
+                "WHERE netmask >= ? AND address >= ? AND "
+                "address <= ? ORDER BY netmask, address ASC",
+                (network.prefixlen,
+                    network_address_to_int(network),
+                    network_broadcast_to_int(network)))
+        results = c.fetchall()
+        if results == None or results[0]["net"] != str(network):
+            raise_fault("NetworkNotInDatabase")
+
+        ret = { "address" : results[0]["net"].split("/")[0],
+                "cidr" : results[0]["net"],
+                "netmask" : results[0]["netmask"],
+                "children" : list()}
+
+        def insert_in_netlist(ip_net, netlist, remaining_depth):
+            """
+            This function creates a network dictionary and appends it recursive
+            in one of the network dictionaries in the netlist or appends it to
+            the netlist if it does not fit into the dicts already in the list.
+            If the remaining_depth reaches 0 it aborts.
+            """
+            for c in netlist:
+                c_net = ip_network(c["cidr"])
+                if c_net.overlaps(ip_net):
+                    if remaining_depth != 0:
+                        insert_in_netlist(ip_net, c["children"], remaining_depth-1)
+                    return
+            netlist.append({"address" : n["net"].split("/")[0],
+                "cidr": n["net"],
+                "netmask" : n["netmask"],
+                "children" : list()})
+
+        if depth != 0:
+            for n in results[1:]:
+                n_net = ip_network(n["net"])
+                insert_in_netlist(n_net, ret["children"], depth-1)
+
+        return ret
+
+    except ValueError:
+        raise_fault("InvalidNetworkDescription");
 
 def add_net(net):
     """
@@ -24,18 +116,35 @@ def add_net(net):
     Those will then be children of the new network.
     If the network already existed nothing will be changed.
     :param net: a network in cidr notation
+    :raises Fault: raises a xmlrpc.server.Fault with an error code and message
     """
-    #TODO
-    return None
+    try:
+        network = ip_network(net)
+        c = db_conn.cursor()
+        c.execute("INSERT OR IGNORE INTO networks (net, address, netmask) VALUES (?,?,?)", (str(network), network_address_to_int(network), network.prefixlen))
+        db_conn.commit()
 
-def del_net(net, recursive=False):
+    except ValueError:
+        raise_fault("InvalidNetworkDescription");
+
+def delete_net(net, recursive=False):
     """
     deletes the given network.
     :param net: a network in cidr notation
     :param recursive: whether to delete all children or not
     """
-    #TODO
-    return None
+    try:
+        network = ip_network(net)
+        c = db_conn.cursor()
+        if recursive:
+            c.execute("DELETE FROM networks WHERE netmask >= ? AND address >= ? and address <= ?",
+                    (network.prefixlen, network_address_to_int(network), network_broadcast_to_int(network)))
+        else:
+            c.execute("DELETE FROM networks WHERE net = '?'" , str(network))
+        db_conn.commit()
+        return None
+    except ValueError:
+        raise_fault("InvalidNetworkDescription")
 
 def claim_net(net, size):
     """
@@ -109,3 +218,33 @@ def get_tags(net):
     """
     #TODO
     return None
+
+def setup_xmlrpc_server():
+    server = SimpleXMLRPCServer((config.xmlrpc_address, config.xmlrpc_port), allow_none=True)
+    server.register_introspection_functions()
+    server.register_multicall_functions()
+    server.register_function(get_net, "get_net")
+    server.register_function(add_net, "add_net")
+    server.register_function(delete_net, "delete_net")
+    server.register_function(claim_net, "claim_net")
+    server.register_function(get_tag, "get_tag")
+    server.register_function(add_tag, "add_tag")
+    server.register_function(delete_tag, "delete_tag")
+    server.register_function(modify_tag, "modify_tag")
+    server.register_function(get_tags, "get_tags")
+
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        server.shutdown()
+        close_database_connection()
+        print("exiting")
+
+if __name__ == "__main__":
+    start_database_connection()
+    print(get_net("192.168.0.0/16", 1))
+    setup_xmlrpc_server()
+
+
+
+
