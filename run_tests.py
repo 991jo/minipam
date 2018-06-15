@@ -1,7 +1,8 @@
 #!/usr/bin/env
 
 import unittest
-from test.test import *
+from test.net_methods import *
+from test.tag_methods import *
 
 unittest.main()
 

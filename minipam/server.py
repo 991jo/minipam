@@ -220,7 +220,7 @@ def add_tag(net, tag_name, tag_value):
         c = db_conn.cursor()
         c.execute("INSERT INTO tags (network_id, tag_name, tag_value) "
         "VALUES ((SELECT id FROM networks WHERE net = ?), ?, ?)",
-        (net, tag_name, tag_name));
+        (net, tag_name, tag_value));
     except ValueError:
         raise_fault("InvalidNetworkDescription")
     except sqlite3.IntegrityError:
@@ -234,8 +234,6 @@ def delete_tag(net, tag_name):
     :param net: the network from which the tag should be deleted.
     :param tag_name: the name of the tag to delete.
     :returns: name and value of the deleted tag.
-    :raises TagDoesNotExist: raises a TagDoesNotExist error if the tag does not
-    exist.
     """
     try:
         network = ip_network(net)
@@ -258,8 +256,18 @@ def modify_tag(net, tag_name, tag_value):
     :raises TagDoesNotExist: raises a TagDoesNotExist error if the tag does not
     exist.
     """
-    #TODO
-    return None
+    try:
+        network = ip_network(net)
+        c = db_conn.cursor()
+        c.execute("UPDATE tags SET tag_value = ? "
+                "WHERE network_id = (SELECT id FROM networks WHERE net = ?) "
+                "AND tag_name=?",
+                (tag_value, str(network), tag_name))
+        db_conn.commit()
+        if c.rowcount == 0:
+            raise_fault("TagDoesNotExist")
+    except ValueError:
+        raise_fault("InvalidNetworkDescription")
 
 def get_tag(net, tag_name):
     """
@@ -271,8 +279,21 @@ def get_tag(net, tag_name):
     :raises TagDoesNotExist: raises a TagDoesNotExist error if the tag does not
     exist.
     """
-    #TODO
-    return None
+    try:
+        network = ip_network(net)
+        c = db_conn.cursor()
+        c.execute("SELECT tag_value FROM tags WHERE "
+                "network_id = (SELECT id FROM networks WHERE net = ?) AND "
+                "tag_name = ?",
+                (str(network), tag_name))
+        result = c.fetchone()
+        if result is None:
+            raise_fault("TagDoesNotExist")
+        db_conn.commit()
+        return result["tag_value"];
+
+    except ValueError:
+        raise_fault("InvalidNetworkDescription")
 
 def get_tags(net):
     """
@@ -283,8 +304,17 @@ def get_tags(net):
     :raises NetDoesNotExist: raises a NetDoesNotExist error if the tag does not
     exist.
     """
-    #TODO
-    return None
+    try:
+        network = ip_network(net)
+        c = db_conn.cursor()
+        c.execute("SELECT tag_name, tag_value FROM tags WHERE "
+                "network_id = (SELECT id FROM networks WHERE net = ?)",
+                (str(network),))
+        result = { r["tag_name"]:r["tag_value"] for r in c.fetchall() }
+        return result;
+
+    except ValueError:
+        raise_fault("InvalidNetworkDescription")
 
 def setup_xmlrpc_server():
     server = SimpleXMLRPCServer((config.xmlrpc_address, config.xmlrpc_port), allow_none=True)

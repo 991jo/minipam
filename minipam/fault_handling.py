@@ -4,7 +4,8 @@ fault_strings = { 1000: "InvalidFaultCode",
         1001: "InvalidNetworkDescription",
         1002: "NoMatchingGapAvailable",
         1003: "NetworkNotInDatabase",
-        1004: "TagExists"}
+        1004: "TagExists",
+        1005: "TagDoesNotExist"}
 
 #inverse mapping of the fault strings
 fault_codes = {v : k for k,v in fault_strings.items()}

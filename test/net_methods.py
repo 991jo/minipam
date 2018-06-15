@@ -4,7 +4,7 @@ from os import remove
 from xmlrpc.server import Fault
 from minipam.server import *
 
-class TestAddMethods(unittest.TestCase):
+class TestAddNetMethods(unittest.TestCase):
     @classmethod
     def setUpClass(self):
         try:
@@ -30,7 +30,7 @@ class TestAddMethods(unittest.TestCase):
             add_net("127.0.0.1/8")
         self.assertEqual(cm.exception.faultString, "InvalidNetworkDescription")
 
-class TestGetMethods(unittest.TestCase):
+class TestGetNetMethods(unittest.TestCase):
     @classmethod
     def setUpClass(self):
         try:
@@ -80,7 +80,7 @@ class TestGetMethods(unittest.TestCase):
             get_net("10.0.0.0/8")
         self.assertEqual(cm.exception.faultString, "NetworkNotInDatabase")
 
-class TestDeleteMethods(unittest.TestCase):
+class TestDeleteNetMethods(unittest.TestCase):
     def setUp(self):
         try:
             remove("test.db")
@@ -133,7 +133,7 @@ class TestDeleteMethods(unittest.TestCase):
     def test_get_net_not_in_db(self):
         delete_net("10.0.0.0/8")
 
-class TestClaimMethods(unittest.TestCase):
+class TestClaimNetMethods(unittest.TestCase):
     def setUp(self):
         try:
             remove("test.db")
