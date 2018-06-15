@@ -17,7 +17,7 @@ An IPAM software that tries to work and suck less than everything else that exis
 
 # Current status
 
-Work in progress. Backend is working.
+Work in progress. Backend is working. Some issues exist (see the Github issue page).
 
 # Tests
 
