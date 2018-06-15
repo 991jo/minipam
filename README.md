@@ -12,8 +12,15 @@ An IPAM software that tries to work and suck less than everything else that exis
 - seperation between backend and frontend.
 - communication with xmlrpc to be directly scriptable.
 - no seperation between networks and IPs (IPs are /32 networks)
-- be flexible by adding tags (key-value-pairs) to networks.
+- no special fixed data fields like hostnames, vlans, customer ids and the like
+- instead it is possibly to tag networks with key-value pairs
 
-# current status
+# Current status
 
-Work in progress, no functioning backend right now.
+Work in progress. Backend is working.
+
+# Tests
+
+To execute the test run `run_tests.py`. You do not have to fear for your database.
+The tests use a temporary database named `test.db`.
+As long as you do not name your database `test.db` you are fine.
