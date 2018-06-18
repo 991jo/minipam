@@ -59,7 +59,9 @@ def close_database_connection():
 def get_net(net, depth=-1):
     """
     returns networks within the given network.
-    This network does have to exist in the database
+    This network does not have to exist in the database
+    if the network does not exist in the database the "network_in_database"
+    variable in the returned dict is False. It is true otherwise.
     :param net: the network (ip/subnet maks) which should be returned
     :param depth: how many levels of children should be added. Default is -1 (return everything)
     means add all children.
@@ -75,13 +77,25 @@ def get_net(net, depth=-1):
                     network_address_to_int(network),
                     network_broadcast_to_int(network)))
         results = c.fetchall()
-        if len(results) == 0 or results[0]["net"] != str(network):
-            raise_fault("NetworkNotInDatabase")
+        #if len(results) == 0:
+        #    raise_fault("NetworkNotInDatabase")
 
-        ret = { "address" : results[0]["net"].split("/")[0],
-                "cidr" : results[0]["net"],
-                "netmask" : results[0]["netmask"],
-                "children" : list()}
+        if len(results) == 0 or results[0]["net"] != str(network):
+            ret = { "address": network.network_address,
+                    "cidr" : str(network),
+                    "netmask": network.prefixlen,
+                    "children": list(),
+                    "network_in_database": False}
+            start = 0
+            if len(results) == 0:
+                return ret
+        else:
+            ret = { "address" : results[0]["net"].split("/")[0],
+                    "cidr" : results[0]["net"],
+                    "netmask" : results[0]["netmask"],
+                    "children" : list(),
+                    "network_in_database": True}
+            start = 1
 
         def insert_in_netlist(ip_net, netlist, remaining_depth):
             """
@@ -99,10 +113,11 @@ def get_net(net, depth=-1):
             netlist.append({"address" : n["net"].split("/")[0],
                 "cidr": n["net"],
                 "netmask" : n["netmask"],
-                "children" : list()})
+                "children" : list(),
+                "network_in_database" : True})
 
         if depth != 0:
-            for n in results[1:]:
+            for n in results[start:]:
                 n_net = ip_network(n["net"])
                 insert_in_netlist(n_net, ret["children"], depth-1)
 

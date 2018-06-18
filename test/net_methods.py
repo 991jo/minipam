@@ -76,9 +76,21 @@ class TestGetNetMethods(unittest.TestCase):
         self.assertEqual(cm.exception.faultString, "InvalidNetworkDescription")
 
     def test_get_net_not_in_db(self):
-        with self.assertRaises(Fault) as cm:
-            get_net("10.0.0.0/8")
-        self.assertEqual(cm.exception.faultString, "NetworkNotInDatabase")
+        result = get_net("0.0.0.0/0")
+        self.assertEqual(result["cidr"] , "0.0.0.0/0")
+        self.assertEqual(result["network_in_database"] , False)
+        self.assertEqual(len(result["children"]), 1)
+        self.assertEqual(result["children"][0]["address"], "127.0.0.0")
+        self.assertEqual(result["children"][0]["netmask"], 8)
+        self.assertEqual(len(result["children"][0]["children"]), 1)
+
+    def test_get_net_not_in_db_and_empty(self):
+        result = get_net("128.0.0.0/8")
+        self.assertEqual(result["cidr"], "128.0.0.0/8")
+        self.assertEqual(result["network_in_database"], False)
+        self.assertEqual(len(result["children"]), 0)
+
+
 
 class TestDeleteNetMethods(unittest.TestCase):
     def setUp(self):
@@ -107,9 +119,8 @@ class TestDeleteNetMethods(unittest.TestCase):
 
     def test_delete_net_recursive(self):
         delete_net("127.0.0.0/8", recursive=True)
-        with self.assertRaises(Fault) as cm:
-            get_net("127.0.0.0/8")
-        self.assertEqual(cm.exception.faultString, "NetworkNotInDatabase")
+        result = get_net("127.0.0.0/8")
+        self.assertFalse(result["network_in_database"])
 
     def test_delete_net_inner(self):
         delete_net("127.0.0.0/16")
