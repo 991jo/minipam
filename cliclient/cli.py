@@ -9,15 +9,24 @@ from pprint import PrettyPrinter
 parser = argparse.ArgumentParser(description="a CLI client for minipam")
 parser.add_argument("--server", nargs=1, type=str, metavar="SERVER")
 group = parser.add_mutually_exclusive_group()
-group.add_argument("--add-net","-an", nargs=1, type=str, metavar="NET", help="add the network NET")
-group.add_argument("--delete-net","-dn", nargs=1, type=str, metavar="NET", help="delete the network NET")
-group.add_argument("--get-net","-gn", nargs=1, type=str, metavar="NET", help="get a network and it's children")
-group.add_argument("--claim-net","-cn", nargs=2, type=str, metavar=("NET", "NETMASK"), help="claim a new network with a subnet mask of NETMASK in the network NET")
-group.add_argument("--add-tag","-at", nargs=3, type=str, metavar=("NET", "TAGNAME", "TAGVALUE"), help="add a tag to the network NET with the name TAGNAME and value TAGVALUE")
-group.add_argument("--delete-tag","-dt", nargs=2, type=str, metavar=("NET", "TAGNAME"), help="delete the tag TAGNAME from the network NET")
-group.add_argument("--modify-tag","-mt", nargs=3, type=str, metavar=("NET", "TAGNAME", "TAGVALUE"), help="modify the value of the tag TAGNAME to TAGVALUE for the network NET")
-group.add_argument("--get-tag","-gt", nargs=2, type=str, metavar=("NET", "TAGNAME"), help="get the value of the tag TAGNAME for network NETWORK")
-group.add_argument("--get-tags","-gts", nargs=1, type=str, metavar="NET", help="get all tags from the network NET")
+group.add_argument("--add-net","-an", nargs=1, type=str, metavar="NET",
+        help="add the network NET")
+group.add_argument("--delete-net","-dn", nargs=1, type=str, metavar="NET",
+        help="delete the network NET")
+group.add_argument("--get-net","-gn", nargs=1, type=str, metavar="NET",
+        help="get a network and it's children")
+group.add_argument("--claim-net","-cn", nargs=2, type=str, metavar=("NET", "NETMASK"),
+        help="claim a new network with a subnet mask of NETMASK in the network NET")
+group.add_argument("--add-tag","-at", nargs=3, type=str, metavar=("NET", "TAGNAME", "TAGVALUE"),
+        help="add a tag to the network NET with the name TAGNAME and value TAGVALUE")
+group.add_argument("--delete-tag","-dt", nargs=2, type=str, metavar=("NET", "TAGNAME"),
+        help="delete the tag TAGNAME from the network NET")
+group.add_argument("--modify-tag","-mt", nargs=3, type=str, metavar=("NET", "TAGNAME", "TAGVALUE"),
+        help="modify the value of the tag TAGNAME to TAGVALUE for the network NET")
+group.add_argument("--get-tag","-gt", nargs=2, type=str, metavar=("NET", "TAGNAME"),
+        help="get the value of the tag TAGNAME for network NETWORK")
+group.add_argument("--get-tags","-gts", nargs=1, type=str, metavar="NET",
+        help="get all tags from the network NET")
 args = parser.parse_args()
 
 if args.server is None:
