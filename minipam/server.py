@@ -159,7 +159,6 @@ def delete_net(net, recursive=False):
         else:
             c.execute("DELETE FROM networks WHERE net = ?" , (str(network),))
         db_conn.commit()
-        return None
     except ValueError:
         raise_fault("InvalidNetworkDescription")
 
@@ -235,8 +234,6 @@ def claim_net(net, size):
     except ValueError:
         raise_fault("InvalidNetworkDescription")
 
-
-    return None
 
 def add_tag(net, tag_name, tag_value):
     """
