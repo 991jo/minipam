@@ -3,7 +3,8 @@ An IPAM software that tries to work and suck less than everything else that exis
 
 # Design Goals
 
-- no dependencies besides python3 standard library and sqlite3 (version >= 3.6.19 for foreign key support which should come with the standard library)
+- no dependencies besides python3 standard library and sqlite3
+  (version >= 3.6.19 for foreign key support which should come with the standard library)
 - just a simple sqlite3 database
 - keep things simple and minimal
 - currently only IPv4 support because for my use case (LAN Party setups) there
@@ -17,10 +18,16 @@ An IPAM software that tries to work and suck less than everything else that exis
 
 # Current status
 
-Work in progress. Backend is working. A minimal cli client exists in cliclient
+Work in progress. Backend is working. A minimal cli client exists in the `cliclient`
+directory
 
 # Tests
 
 To execute the test run `run_tests.py`. You do not have to fear for your database.
 The tests use a temporary database named `test.db`.
 As long as you do not name your database `test.db` you are fine.
+
+# Examples
+
+The most minimal example for interacting with minipam via XML RPC can be found
+in the `examples` directory.
