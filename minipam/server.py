@@ -72,7 +72,7 @@ def get_net(net, depth=-1):
         c = db_conn.cursor()
         c.execute("SELECT net, address, netmask FROM networks "
                 "WHERE netmask >= ? AND address >= ? AND "
-                "address <= ? ORDER BY netmask, address ASC",
+                "address <= ? ORDER BY address ASC, netmask ASC",
                 (network.prefixlen,
                     network_address_to_int(network),
                     network_broadcast_to_int(network)))
@@ -81,7 +81,7 @@ def get_net(net, depth=-1):
         #    raise_fault("NetworkNotInDatabase")
 
         if len(results) == 0 or results[0]["net"] != str(network):
-            ret = { "address": network.network_address,
+            ret = { "address": str(network.network_address),
                     "cidr" : str(network),
                     "netmask": network.prefixlen,
                     "children": list(),
@@ -177,21 +177,32 @@ def claim_net(net, size):
         network = ip_network(net)
         required_gap = 2**(network.max_prefixlen - size)
 
-        if size > network.max_prefixlen - network.prefixlen:
+        if size < network.prefixlen:
             raise_fault("NoMatchingGapAvailable")
 
         nets = get_net(net, depth=1)
 
         if len(nets["children"]) == 0:
-            add_net(net)
-            return get_net(net, depth=0)
+            network_string = str(network.network_address) + "/" + str(size)
+            add_net(network_string)
+            return get_net(network_string, depth=0)
         else: #at least one child exists.
+
+            def next_start_address(net, size):
+                if size >= net.prefixlen:
+                    start_addr = network_broadcast_to_int(net) + 1
+                else:
+                    size_diff = net.prefixlen - size
+                    supernet = net.supernet(size_diff)
+                    start_addr = int(supernet.network_address) + 2**(supernet.max_prefixlen-supernet.prefixlen)
+                return start_addr
+
             smallest_gap = None
+
             # start and end gaps
             first_block = ip_network(nets["children"][0]["cidr"])
-            last_block = ip_network(nets["children"][-1]["cidr"])
             first_gap = network_address_to_int(first_block) - network_address_to_int(network)
-            last_gap =  network_broadcast_to_int(network) - network_broadcast_to_int(last_block) -1
+
             if first_gap >= required_gap:
                 smallest_gap = { "address" : network.network_address,
                         "length" : first_gap }
@@ -200,12 +211,18 @@ def claim_net(net, size):
             for i, n in enumerate(nets["children"][:-1]):
                 net1 = ip_network(n["cidr"])
                 net2 = ip_network(nets["children"][i+1]["cidr"])
-                gap = network_address_to_int(net2) - network_broadcast_to_int(net1) - 1
+                start_addr = next_start_address(net1, size)
+                gap = network_address_to_int(net2) - start_addr
                 if gap >= required_gap and (smallest_gap is None or gap < smallest_gap["length"]):
-                    smallest_gap = {"address" : ip_address(network_broadcast_to_int(net1) + 1),
+                    smallest_gap = {"address" : ip_address(start_addr),
                             "length": gap}
-            if last_gap > required_gap and (smallest_gap is None or last_gap < smallest_gap["length"]):
-                smallest_gap = { "address" : ip_address(network_broadcast_to_int(last_block) + 1),
+
+            # the last gap
+            last_block = ip_network(nets["children"][-1]["cidr"])
+            last_gap_start = next_start_address(last_block, size)
+            last_gap =  network_broadcast_to_int(network) - last_gap_start + 1
+            if last_gap >= required_gap and (smallest_gap is None or last_gap < smallest_gap["length"]):
+                smallest_gap = { "address" : ip_address(last_gap_start),
                         "length" :last_gap}
 
             if smallest_gap is None:

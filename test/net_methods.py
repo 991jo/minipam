@@ -159,6 +159,15 @@ class TestClaimNetMethods(unittest.TestCase):
         close_database_connection()
         remove("test.db")
 
+    #@unittest.skip("")
+    def test_claim_normal_empty_subnet(self):
+        claimed = claim_net("127.0.0.0/8", 16)
+        result = get_net("127.0.0.0/8")
+        self.assertEqual(claimed["cidr"], "127.0.0.0/16")
+        self.assertEqual(len(result["children"]), 1)
+        self.assertEqual(result["children"][0]["cidr"], "127.0.0.0/16")
+
+    #@unittest.skip("")
     def test_claim_normal(self):
         add_net("127.0.0.0/16")
         add_net("127.2.0.0/16")
@@ -170,6 +179,7 @@ class TestClaimNetMethods(unittest.TestCase):
         for i in range(3):
             self.assertEqual(result["children"][i]["address"], "127.%d.0.0" % i)
 
+    #@unittest.skip("")
     def test_claim_first_gap(self):
         add_net("127.1.0.0/16")
         add_net("127.2.0.0/16")
@@ -180,6 +190,7 @@ class TestClaimNetMethods(unittest.TestCase):
         for i in range(3):
             self.assertEqual(result["children"][i]["address"], "127.%d.0.0" % i)
 
+    #@unittest.skip("")
     def test_claim_last_gap(self):
         add_net("127.0.0.0/16")
         add_net("127.1.0.0/16")
@@ -189,6 +200,25 @@ class TestClaimNetMethods(unittest.TestCase):
         self.assertEqual(len(result["children"]), 3)
         for i in range(3):
             self.assertEqual(result["children"][i]["address"], "127.%d.0.0" % i)
+
+    #@unittest.skip("")
+    def test_claim_only_last_gap_remaining(self):
+        add_net("127.0.0.0/16")
+        add_net("127.0.0.0/18")
+        add_net("127.0.64.0/18")
+        add_net("127.0.128.0/18")
+        claim_net("127.0.0.0/16", 18)
+        result = get_net("127.0.0.0/16")
+        self.assertEqual(result["cidr"] , "127.0.0.0/16")
+        self.assertEqual(len(result["children"]), 4)
+        for i in range(4):
+            self.assertEqual(result["children"][i]["address"], "127.0.%s.0" % str(i*64))
+
+    def test_claim_last_gap_with_offset(self):
+        add_net("1.0.0.0/8")
+        add_net("1.2.3.0/24")
+        result = claim_net("1.0.0.0/8", 9)
+        self.assertEqual(result["cidr"], "1.128.0.0/9")
 
     def test_claim_no_matching_gap(self):
         add_net("127.0.0.0/9")
@@ -201,3 +231,11 @@ class TestClaimNetMethods(unittest.TestCase):
         with self.assertRaises(Fault) as cm:
             claim_net("127.0.0.1/8", 16)
         self.assertEqual(cm.exception.faultString, "InvalidNetworkDescription")
+
+    def test_claim_no_matching_gap_at_start(self):
+        add_net("1.0.0.0/8")
+        add_net("1.2.3.0/24")
+        add_net("1.128.0.0/9")
+        with self.assertRaises(Fault) as cm:
+            claim_net("1.0.0.0/8", 9)
+        self.assertEqual(cm.exception.faultString, "NoMatchingGapAvailable")
