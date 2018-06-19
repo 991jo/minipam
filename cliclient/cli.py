@@ -28,6 +28,8 @@ group.add_argument("--get-tag","-gt", nargs=2, type=str, metavar=("NET", "TAGNAM
         help="get the value of the tag TAGNAME for network NETWORK")
 group.add_argument("--get-tags","-gts", nargs=1, type=str, metavar="NET",
         help="get all tags from the network NET")
+group.add_argument("--get-nets-by-tag","-gtt", nargs=1, type=str, metavar="TAGNAME",
+        help="get all networks with the tag TAGNAME")
 args = parser.parse_args()
 
 if args.server is None:
@@ -80,3 +82,6 @@ with ServerProxy(args.server[0]) as server:
         server.modify_tag(args.modify_tag[0], args.modify_tag[1], args.modify_tag[2])
     elif args.delete_tag is not None:
         server.delete_tag(args.delete_tag[0], args.delete_tag[1])
+    elif args.get_nets_by_tag is not None:
+        pp.pprint(server.get_net_by_tag(args.get_nets_by_tag[0]))
+

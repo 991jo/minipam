@@ -234,6 +234,21 @@ def claim_net(net, size):
     except ValueError:
         raise_fault("InvalidNetworkDescription")
 
+def get_net_by_tag(tag_name):
+    """
+    :param tag_name: the tag to be searched for
+    : returns : all networks with the given tag and the tag value.
+    """
+    c = db_conn.cursor()
+
+    c.execute("SELECT net, tag_name, tag_value FROM networks JOIN tags ON id = network_id WHERE tag_name = ?", (tag_name,))
+
+    data = list()
+    res = c.fetchall()
+    for d in res:
+        data.append({ k:d[k] for k in d.keys()})
+
+    return data
 
 def add_tag(net, tag_name, tag_value):
     """
@@ -353,6 +368,7 @@ def setup_xmlrpc_server():
     server.register_function(add_net, "add_net")
     server.register_function(delete_net, "delete_net")
     server.register_function(claim_net, "claim_net")
+    server.register_function(get_net_by_tag,"get_net_by_tag")
     server.register_function(get_tag, "get_tag")
     server.register_function(add_tag, "add_tag")
     server.register_function(delete_tag, "delete_tag")
