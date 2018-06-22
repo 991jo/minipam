@@ -80,12 +80,18 @@ def get_net(net, depth=-1):
         #if len(results) == 0:
         #    raise_fault("NetworkNotInDatabase")
 
+        def add_tags(net):
+            c.execute("SELECT tag_name, tag_value FROM tags JOIN networks ON"
+                    " network_id = id WHERE net = ?", (net["cidr"],))
+            net["tags"] = {l[0] : l[1] for l in c.fetchall()}
+
         if len(results) == 0 or results[0]["net"] != str(network):
             ret = { "address": str(network.network_address),
                     "cidr" : str(network),
                     "netmask": network.prefixlen,
                     "children": list(),
                     "network_in_database": False}
+            add_tags(ret)
             start = 0
             if len(results) == 0:
                 return ret
@@ -95,6 +101,7 @@ def get_net(net, depth=-1):
                     "netmask" : results[0]["netmask"],
                     "children" : list(),
                     "network_in_database": True}
+            add_tags(ret)
             start = 1
 
         def insert_in_netlist(ip_net, netlist, remaining_depth):
@@ -115,6 +122,7 @@ def get_net(net, depth=-1):
                 "netmask" : n["netmask"],
                 "children" : list(),
                 "network_in_database" : True})
+            add_tags(netlist[-1])
 
         if depth != 0:
             for n in results[start:]:
