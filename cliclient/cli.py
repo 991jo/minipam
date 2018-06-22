@@ -54,8 +54,11 @@ with ServerProxy(args.server[0]) as server:
         result = server.get_net(args.get_net[0])
 
         def recursive_print(net, indent=0):
+            name = ""
+            if "name" in net["tags"]:
+                name = net["tags"]["name"]
             if net["network_in_database"]:
-                print(" "*indent, net["cidr"])
+                print(" "*indent, net["cidr"] , name)
             else:
                 print(" "*indent, "(%s) - not in database" % net["cidr"])
             for child in net["children"]:
