@@ -268,6 +268,7 @@ def add_tag(net, tag_name, tag_value):
     except ValueError:
         raise_fault("InvalidNetworkDescription")
     except sqlite3.IntegrityError:
+        # TODO This captures to much, e.g. if someone wants to add a tag for a net that does not exist.
         raise_fault("TagExists")
     db_conn.commit()
 
